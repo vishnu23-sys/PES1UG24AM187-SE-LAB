@@ -1,10 +1,9 @@
 """
 GameEngine: owns the player and all coins.
 
-Starter version: one coin type, no obstacles, no timer yet. Coin
-collection also has a known bug (see how `update` uses check_collection
-below) that Task 1 asks you to fix - collected coins are never removed,
-so standing on one keeps awarding points every frame.
+One coin type, no obstacles, no timer yet. Each coin is collected exactly
+once: `update` removes it as soon as it is scored and spawns a new coin
+somewhere else.
 """
 
 import random
@@ -46,6 +45,10 @@ class GameEngine:
         collected = check_collection(self.player, self.coins)
         for coin in collected:
             self.score += coin.value
+            # Remove the coin so it can only be collected once, and spawn a
+            # fresh one elsewhere so the play area never runs dry.
+            self.coins.remove(coin)
+            self.coins.append(self._random_coin())
 
     def draw(self, surface, font):
         from game import renderer
