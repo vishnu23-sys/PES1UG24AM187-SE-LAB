@@ -3,7 +3,7 @@ Coin Collector (Lab Starter)
 
 Run with:  python3 main.py
 
-Controls: Arrow keys to move.
+Controls: Arrow keys to move. R starts a new round once the round is over.
 """
 
 import pygame
@@ -22,17 +22,19 @@ def main():
     engine = GameEngine()
     running = True
     while running:
+        dt = clock.tick(60) / 1000  # seconds since the last frame
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            else:
+                engine.handle_event(event)
 
         keys = pygame.key.get_pressed()
         engine.handle_input(keys)
-        engine.update()
+        engine.update(dt)
         engine.draw(screen, font)
 
         pygame.display.flip()
-        clock.tick(60)
 
     pygame.quit()
 
