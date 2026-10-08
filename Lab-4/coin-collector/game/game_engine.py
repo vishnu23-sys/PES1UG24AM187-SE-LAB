@@ -1,21 +1,20 @@
 """
 GameEngine: owns the player and all coins.
 
-One coin type, no obstacles, no timer yet. Each coin is collected exactly
-once: `update` removes it as soon as it is scored and spawns a new coin
-somewhere else.
+Bronze, silver and gold coins (see game/coin.py), no obstacles, no timer
+yet. Each coin is collected exactly once: `update` removes it as soon as
+it is scored and spawns a new coin somewhere else.
 """
 
 import random
 import pygame
 
 from game.player import Player
-from game.coin import Coin
+from game.coin import Coin, COIN_TYPES, random_coin_type
 from game.collection import check_collection
 from game.renderer import WIDTH, HEIGHT
 
 NUM_COINS = 6
-COIN_VALUE = 1
 
 
 class GameEngine:
@@ -26,8 +25,8 @@ class GameEngine:
 
     def _random_coin(self):
         x = random.randint(30, WIDTH - 30)
-        y = random.randint(30, HEIGHT - 30)
-        return Coin(x=x, y=y, radius=12, value=COIN_VALUE)
+        y = random.randint(50, HEIGHT - 50)  # keep clear of the HUD rows
+        return Coin(x=x, y=y, kind=random_coin_type())
 
     def handle_input(self, keys_pressed):
         dx = dy = 0
@@ -54,3 +53,4 @@ class GameEngine:
         from game import renderer
         renderer.draw_scene(surface, self.player, self.coins)
         renderer.draw_text(surface, font, f"Score: {self.score}", (10, 10))
+        renderer.draw_coin_legend(surface, font, COIN_TYPES)
