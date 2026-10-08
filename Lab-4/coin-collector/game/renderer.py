@@ -10,13 +10,33 @@ WINDOW_SIZE = (WIDTH, HEIGHT)
 COLOR_BG = (35, 45, 35)
 COLOR_PLAYER = (80, 180, 255)
 COLOR_TEXT = (255, 255, 255)
+COLOR_OBSTACLE = (200, 60, 60)
+COLOR_OBSTACLE_EDGE = (120, 25, 25)
+COLOR_HEART = (235, 70, 90)
 
 
-def draw_scene(surface, player, coins):
+def draw_scene(surface, player, coins, obstacles=(), show_player=True):
     surface.fill(COLOR_BG)
     for coin in coins:
         draw_coin(surface, coin.color, (int(coin.x), int(coin.y)), coin.radius)
-    pygame.draw.rect(surface, COLOR_PLAYER, player.get_rect(), border_radius=4)
+    for obstacle in obstacles:
+        rect = obstacle.get_rect()
+        pygame.draw.rect(surface, COLOR_OBSTACLE, rect, border_radius=3)
+        pygame.draw.rect(surface, COLOR_OBSTACLE_EDGE, rect, width=2, border_radius=3)
+    if show_player:
+        pygame.draw.rect(surface, COLOR_PLAYER, player.get_rect(), border_radius=4)
+
+
+def draw_lives(surface, font, lives):
+    """Lives counter in the top-right corner, drawn as red hearts."""
+    label = font.render("Lives:", True, COLOR_TEXT)
+    x = surface.get_width() - 10 - label.get_width() - 3 * 22
+    surface.blit(label, (x, 10))
+    for i in range(lives):
+        cx, cy = x + label.get_width() + 14 + i * 22, 22
+        pygame.draw.circle(surface, COLOR_HEART, (cx - 4, cy - 2), 5)
+        pygame.draw.circle(surface, COLOR_HEART, (cx + 4, cy - 2), 5)
+        pygame.draw.polygon(surface, COLOR_HEART, [(cx - 9, cy), (cx + 9, cy), (cx, cy + 9)])
 
 
 def draw_coin(surface, color, center, radius):
