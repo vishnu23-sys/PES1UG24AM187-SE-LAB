@@ -2,6 +2,8 @@
 renderer: all pygame drawing lives here, kept separate from game logic.
 """
 
+import math
+
 import pygame
 
 WIDTH, HEIGHT = 700, 500
@@ -13,6 +15,7 @@ COLOR_TEXT = (255, 255, 255)
 COLOR_OBSTACLE = (200, 60, 60)
 COLOR_OBSTACLE_EDGE = (120, 25, 25)
 COLOR_HEART = (235, 70, 90)
+COLOR_WARNING = (255, 90, 90)
 
 
 def draw_scene(surface, player, coins, obstacles=(), show_player=True):
@@ -63,3 +66,34 @@ def draw_banner(surface, font, text):
     surf = font.render(text, True, (255, 220, 80))
     rect = surf.get_rect(center=(surface.get_width() // 2, surface.get_height() // 2))
     surface.blit(surf, rect)
+
+
+def draw_timer(surface, font, time_left):
+    """Countdown at the top centre; turns red for the last 5 seconds."""
+    seconds = math.ceil(time_left)
+    color = COLOR_WARNING if seconds <= 5 else COLOR_TEXT
+    surf = font.render(f"Time: {seconds:2d}", True, color)
+    surface.blit(surf, surf.get_rect(midtop=(surface.get_width() // 2, 10)))
+
+
+_big_font = None
+
+
+def draw_round_over(surface, font, reason, score):
+    """Dim the play area and show why the round ended, the score, and how to restart."""
+    global _big_font
+    if _big_font is None:
+        _big_font = pygame.font.SysFont("consolas", 44, bold=True)
+
+    shade = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+    shade.fill((0, 0, 0, 170))
+    surface.blit(shade, (0, 0))
+
+    cx, cy = surface.get_width() // 2, surface.get_height() // 2
+    lines = [
+        (font.render(reason, True, (255, 220, 80)), cy - 60),
+        (_big_font.render(f"Final score: {score}", True, COLOR_TEXT), cy),
+        (font.render("Press R to play again", True, (170, 220, 255)), cy + 55),
+    ]
+    for surf, y in lines:
+        surface.blit(surf, surf.get_rect(center=(cx, y)))
