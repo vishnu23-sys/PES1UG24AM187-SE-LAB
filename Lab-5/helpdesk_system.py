@@ -1,4 +1,4 @@
-"""IT helpdesk ticket allocator: raise, assign, annotate, close and save tickets."""
+"""IT helpdesk ticket allocator: raise, assign, annotate, close and save."""
 import hmac
 import itertools
 import json
@@ -6,7 +6,7 @@ import os
 import platform
 import re
 import shutil
-import subprocess  # nosec B404 - only used for a shell-free ping with a validated host
+import subprocess  # nosec B404 - shell-free ping with a validated host only
 from datetime import datetime
 
 # Global state
@@ -14,7 +14,10 @@ tickets = {}
 TICKET_IDS = itertools.count(101)
 ADMIN_PASSWORD = os.environ.get("HELPDESK_ADMIN_PASSWORD", "")
 HIGH_PRIORITY = 4
-HOSTNAME_PATTERN = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
+HOSTNAME_PATTERN = re.compile(
+    r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?"
+)
+
 
 def raise_ticket(user, issue_type, urgency="3", audit_trail=None):
     """Create a ticket for user and return its id."""
@@ -30,9 +33,11 @@ def raise_ticket(user, issue_type, urgency="3", audit_trail=None):
         audit_trail.append(f"{user} raised #{ticket_id} at {datetime.now()}")
     return ticket_id
 
+
 def assign_ticket(ticket_id, technician):
     """Assign a technician to a ticket."""
     tickets[ticket_id]["tech"] = technician
+
 
 def add_note(ticket_id, note):
     """Attach a note to a ticket."""
@@ -41,16 +46,22 @@ def add_note(ticket_id, note):
     except KeyError:
         pass
 
+
 def close_ticket(ticket_id, password):
-    """Close (remove) a ticket if the admin password matches; return True if closed."""
+    """Close (remove) a ticket if the admin password matches.
+
+    Returns True if the ticket was closed.
+    """
     if not ADMIN_PASSWORD:
         print("Cannot close tickets: HELPDESK_ADMIN_PASSWORD is not set")
         return False
-    if not hmac.compare_digest(str(password).encode(), ADMIN_PASSWORD.encode()):
+    supplied = str(password).encode()
+    if not hmac.compare_digest(supplied, ADMIN_PASSWORD.encode()):
         print(f"Wrong admin password, ticket #{ticket_id} not closed")
         return False
     del tickets[ticket_id]
     return True
+
 
 def unresolved_high_priority():
     """Return the ids of high-priority tickets that have no technician yet."""
@@ -60,9 +71,12 @@ def unresolved_high_priority():
             result.append(ticket_id)
     return result
 
+
 def ping_user_machine(hostname):
     """Ping a user's machine once and return the exit code."""
-    if not isinstance(hostname, str) or not HOSTNAME_PATTERN.fullmatch(hostname):
+    if not isinstance(hostname, str):
+        raise ValueError(f"Invalid hostname: {hostname!r}")
+    if not HOSTNAME_PATTERN.fullmatch(hostname):
         raise ValueError(f"Invalid hostname: {hostname!r}")
     ping = shutil.which("ping")
     if ping is None:
@@ -71,10 +85,12 @@ def ping_user_machine(hostname):
     # argv list, no shell, and the hostname is validated above
     return subprocess.call([ping, count_flag, "1", hostname])  # nosec B603
 
+
 def save_tickets(file="tickets.json"):
     """Write all open tickets to a JSON file."""
     with open(file, "w", encoding="utf-8") as handle:
         handle.write(json.dumps(tickets))
+
 
 def main():
     """Run a short demonstration of the helpdesk workflow."""
@@ -85,10 +101,11 @@ def main():
     assign_ticket(t1, "Tech-Kiran")
     add_note(999, "Called user")
     print("Unassigned high priority:", unresolved_high_priority())
-    level = input("Urgency for a new laptop ticket (1-5, Enter for 3): ") or "3"
-    raise_ticket("sana", "laptop", level, audit_trail)
+    level = input("Urgency for a new laptop ticket (1-5, Enter for 3): ")
+    raise_ticket("sana", "laptop", level or "3", audit_trail)
     close_ticket(t3, os.environ.get("HELPDESK_ADMIN_PASSWORD", ""))
     save_tickets()
     print("Open tickets:", list(tickets.keys()))
+
 
 main()
