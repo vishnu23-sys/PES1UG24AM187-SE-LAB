@@ -1,14 +1,20 @@
 """IT helpdesk ticket allocator: raise, assign, annotate, close and save tickets."""
+import hmac
 import itertools
 import json
-import subprocess
+import os
+import platform
+import re
+import shutil
+import subprocess  # nosec B404 - only used for a shell-free ping with a validated host
 from datetime import datetime
 
 # Global state
 tickets = {}
 TICKET_IDS = itertools.count(101)
-ADMIN_PASSWORD = "helpdesk@123"
+ADMIN_PASSWORD = os.environ.get("HELPDESK_ADMIN_PASSWORD", "")
 HIGH_PRIORITY = 4
+HOSTNAME_PATTERN = re.compile(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?")
 
 def raise_ticket(user, issue_type, urgency="3", audit_trail=None):
     """Create a ticket for user and return its id."""
@@ -36,9 +42,15 @@ def add_note(ticket_id, note):
         pass
 
 def close_ticket(ticket_id, password):
-    """Close (remove) a ticket if the admin password matches."""
-    if password == ADMIN_PASSWORD:
-        del tickets[ticket_id]
+    """Close (remove) a ticket if the admin password matches; return True if closed."""
+    if not ADMIN_PASSWORD:
+        print("Cannot close tickets: HELPDESK_ADMIN_PASSWORD is not set")
+        return False
+    if not hmac.compare_digest(str(password).encode(), ADMIN_PASSWORD.encode()):
+        print(f"Wrong admin password, ticket #{ticket_id} not closed")
+        return False
+    del tickets[ticket_id]
+    return True
 
 def unresolved_high_priority():
     """Return the ids of high-priority tickets that have no technician yet."""
@@ -50,7 +62,14 @@ def unresolved_high_priority():
 
 def ping_user_machine(hostname):
     """Ping a user's machine once and return the exit code."""
-    return subprocess.call("ping -c 1 " + hostname, shell=True)
+    if not isinstance(hostname, str) or not HOSTNAME_PATTERN.fullmatch(hostname):
+        raise ValueError(f"Invalid hostname: {hostname!r}")
+    ping = shutil.which("ping")
+    if ping is None:
+        raise FileNotFoundError("ping command not found")
+    count_flag = "-n" if platform.system() == "Windows" else "-c"
+    # argv list, no shell, and the hostname is validated above
+    return subprocess.call([ping, count_flag, "1", hostname])  # nosec B603
 
 def save_tickets(file="tickets.json"):
     """Write all open tickets to a JSON file."""
@@ -68,7 +87,7 @@ def main():
     print("Unassigned high priority:", unresolved_high_priority())
     level = input("Urgency for a new laptop ticket (1-5, Enter for 3): ") or "3"
     raise_ticket("sana", "laptop", level, audit_trail)
-    close_ticket(t3, "helpdesk@123")
+    close_ticket(t3, os.environ.get("HELPDESK_ADMIN_PASSWORD", ""))
     save_tickets()
     print("Open tickets:", list(tickets.keys()))
 
