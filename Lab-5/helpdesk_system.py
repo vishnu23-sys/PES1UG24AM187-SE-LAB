@@ -13,6 +13,8 @@ from datetime import datetime
 tickets = {}
 TICKET_IDS = itertools.count(101)
 ADMIN_PASSWORD = os.environ.get("HELPDESK_ADMIN_PASSWORD", "")
+MIN_URGENCY = 1
+MAX_URGENCY = 5
 HIGH_PRIORITY = 4
 HOSTNAME_PATTERN = re.compile(
     r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?"
@@ -20,12 +22,27 @@ HOSTNAME_PATTERN = re.compile(
 
 
 def raise_ticket(user, issue_type, urgency="3", audit_trail=None):
-    """Create a ticket for user and return its id."""
+    """Create a ticket for user and return its id.
+
+    urgency must be a whole number from 1 to 5, otherwise ValueError is
+    raised and no ticket is created.
+    """
+    try:
+        priority = int(urgency)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"Urgency must be a whole number, got {urgency!r}"
+        ) from None
+    if not MIN_URGENCY <= priority <= MAX_URGENCY:
+        raise ValueError(
+            f"Urgency must be between {MIN_URGENCY} and {MAX_URGENCY}, "
+            f"got {priority}"
+        )
     ticket_id = next(TICKET_IDS)
     tickets[ticket_id] = {
         "user": user,
         "issue": issue_type,
-        "priority": int(urgency),
+        "priority": priority,
         "tech": None,
         "notes": [],
     }
@@ -35,16 +52,21 @@ def raise_ticket(user, issue_type, urgency="3", audit_trail=None):
 
 
 def assign_ticket(ticket_id, technician):
-    """Assign a technician to a ticket."""
+    """Assign a technician to a ticket; return True if it exists."""
+    if ticket_id not in tickets:
+        print(f"Ticket #{ticket_id} not found, cannot assign {technician}")
+        return False
     tickets[ticket_id]["tech"] = technician
+    return True
 
 
 def add_note(ticket_id, note):
-    """Attach a note to a ticket."""
-    try:
-        tickets[ticket_id]["notes"].append(note)
-    except KeyError:
-        pass
+    """Attach a note to a ticket; return True if it exists."""
+    if ticket_id not in tickets:
+        print(f"Ticket #{ticket_id} not found, note not added")
+        return False
+    tickets[ticket_id]["notes"].append(note)
+    return True
 
 
 def close_ticket(ticket_id, password):
@@ -52,6 +74,9 @@ def close_ticket(ticket_id, password):
 
     Returns True if the ticket was closed.
     """
+    if ticket_id not in tickets:
+        print(f"Ticket #{ticket_id} not found, nothing to close")
+        return False
     if not ADMIN_PASSWORD:
         print("Cannot close tickets: HELPDESK_ADMIN_PASSWORD is not set")
         return False
@@ -97,15 +122,24 @@ def main():
     audit_trail = []
     t1 = raise_ticket("anil", "printer", "5", audit_trail)
     raise_ticket("meera", "wifi", "4", audit_trail)
-    t3 = raise_ticket("joe", "vpn", "-7", audit_trail)
+    try:
+        raise_ticket("joe", "vpn", "-7", audit_trail)
+    except ValueError as error:
+        print("Ticket rejected:", error)
+    t3 = raise_ticket("joe", "vpn", "2", audit_trail)
     assign_ticket(t1, "Tech-Kiran")
     add_note(999, "Called user")
     print("Unassigned high priority:", unresolved_high_priority())
     level = input("Urgency for a new laptop ticket (1-5, Enter for 3): ")
-    raise_ticket("sana", "laptop", level or "3", audit_trail)
+    try:
+        raise_ticket("sana", "laptop", level.strip() or "3", audit_trail)
+    except ValueError as error:
+        print("Ticket rejected:", error)
     close_ticket(t3, os.environ.get("HELPDESK_ADMIN_PASSWORD", ""))
     save_tickets()
     print("Open tickets:", list(tickets.keys()))
+    print("Audit trail entries:", len(audit_trail))
 
 
-main()
+if __name__ == "__main__":
+    main()
